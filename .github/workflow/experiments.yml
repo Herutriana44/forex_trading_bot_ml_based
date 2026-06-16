@@ -1,0 +1,43 @@
+name: Run ML Forex Experiment
+
+on:
+  push:
+    branches:
+      - main  # Otomatis berjalan jika ada push ke branch main
+  workflow_dispatch: # Membuat tombol "Run workflow" agar bisa dijalankan manual dari GitHub UI
+
+jobs:
+  train-and-evaluate:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Checkout kode dari repositori ke Runner GitHub
+    - name: Checkout Repository Code
+      uses: actions/checkout@v4
+
+    # 2. Setup environment Python versi 3.10
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip' # Mempercepat run selanjutnya dengan caching dependency
+
+    # 3. Install semua library yang dibutuhkan (ditambah openpyxl untuk excel)
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt -q
+
+    # 4. Eksekusi kode eksperimen Python
+    - name: Run ML Experiment Script
+      run: python experiments.py
+
+    # 5. Mengunggah hasil (Artifacts) agar bisa di-download oleh user
+    - name: Upload Models and Excel Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: forex-ml-experiment-outputs  # Nama zip file yang akan di-download
+        path: |
+          *_model.pkl
+          experiment_results.xlsx
+        retention-days: 7 # File disimpan di server GitHub selama 7 hari sebelum dihapus otomatis

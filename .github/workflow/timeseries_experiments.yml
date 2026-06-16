@@ -29,8 +29,8 @@ jobs:
         pip install -r requirements.txt -q
 
     # 4. Eksekusi kode eksperimen Python
-    - name: Run ML Experiment Script
-      run: python experiments.py
+    - name: Run Time Series ML Experiment Script
+      run: python timeseries_experiments.py
 
     # 5. Mengunggah hasil (Artifacts) agar bisa di-download oleh user
     - name: Upload Models and Excel Results

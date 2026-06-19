@@ -25,7 +25,7 @@ class Prediction(Base):
     confidence = Column(Float)
     current_price = Column(Float)
     timestamp = Column(DateTime, default=datetime.utcnow)
-    metadata = Column(Text)
+    extra_data = Column("metadata", Text)
 
 
 class Trade(Base):
@@ -50,7 +50,7 @@ class ModelMetrics(Base):
     precision = Column(Float)
     recall = Column(Float)
     timestamp = Column(DateTime, default=datetime.utcnow)
-    metadata = Column(Text)
+    extra_data = Column("metadata", Text)
 
 
 Base.metadata.create_all(bind=engine)
@@ -74,7 +74,7 @@ def log_prediction(prediction_data: Dict[str, Any]):
             prediction_class=prediction_data["prediction_class"],
             confidence=prediction_data["confidence"],
             current_price=prediction_data["metadata"]["current_price"],
-            metadata=json.dumps(prediction_data["metadata"])
+            extra_data=json.dumps(prediction_data["metadata"])
         )
         db.add(pred)
         db.commit()
@@ -109,7 +109,7 @@ def log_model_metrics(metrics_data: Dict[str, Any]):
             accuracy=metrics_data["accuracy"],
             precision=metrics_data["precision"],
             recall=metrics_data["recall"],
-            metadata=json.dumps(metrics_data.get("metadata", {}))
+            extra_data=json.dumps(metrics_data.get("metadata", {}))
         )
         db.add(metrics)
         db.commit()

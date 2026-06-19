@@ -38,7 +38,7 @@ def fetch_latest_predictions(limit=10):
                     "confidence": p.confidence,
                     "current_price": p.current_price,
                     "timestamp": p.timestamp.isoformat() if p.timestamp else None,
-                    "metadata": json.loads(p.metadata) if p.metadata else {}
+                    "metadata": json.loads(p.extra_data) if p.extra_data else {}
                 }
                 for p in predictions
             ]

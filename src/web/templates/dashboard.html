@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forex Trading Bot Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        .card {
+            margin-bottom: 20px;
+        }
+        .prediction-card {
+            border-left: 5px solid #28a745;
+        }
+        .trade-card {
+            border-left: 5px solid #007bff;
+        }
+        .model-card {
+            border-left: 5px solid #dc3545;
+        }
+        .streaming-data {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="mb-4">Forex Trading Bot Dashboard</h1>
+
+        <!-- Model Status -->
+        <div class="card model-card">
+            <div class="card-header">
+                <h5 class="mb-0">Model Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <h6>Model Name</h6>
+                        <p id="model-name">{{ model_status.model_name if model_status.model_name else 'N/A' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>Version</h6>
+                        <p id="model-version">{{ model_status.model_version if model_status.model_version else 'N/A' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>Accuracy</h6>
+                        <p id="model-accuracy">{{ "{:.2f}%".format(model_status.accuracy * 100) if model_status.accuracy else 'N/A' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>Last Updated</h6>
+                        <p id="model-timestamp">{{ model_status.timestamp if model_status.timestamp else 'N/A' }}</p>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-3">
+                        <h6>Precision</h6>
+                        <p id="model-precision">{{ "{:.2f}%".format(model_status.precision * 100) if model_status.precision else 'N/A' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>Recall</h6>
+                        <p id="model-recall">{{ "{:.2f}%".format(model_status.recall * 100) if model_status.recall else 'N/A' }}</p>
+                    </div>
+                </div>
+                <button id="retrain-btn" class="btn btn-danger mt-3">Retrain Model</button>
+            </div>
+        </div>
+
+        <!-- Recent Predictions -->
+        <div class="card prediction-card">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Predictions</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <input type="text" id="symbol-input" class="form-control" placeholder="Enter symbol (e.g., EURUSD=X)" value="EURUSD=X">
+                    <button id="predict-btn" class="btn btn-success mt-2">Get Prediction</button>
+                </div>
+                <div class="streaming-data" id="predictions-container">
+                    {% if recent_predictions and recent_predictions.predictions %}
+                        {% for prediction in recent_predictions.predictions %}
+                            <div class="card mb-2">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <h6>Symbol</h6>
+                                            <p>{{ prediction.symbol }}</p>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <h6>Prediction</h6>
+                                            <p>{{ prediction.prediction_class }}</p>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <h6>Confidence</h6>
+                                            <p>{{ "{:.2f}%".format(prediction.confidence * 100) }}</p>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <h6>Timestamp</h6>
+                                            <p>{{ prediction.timestamp }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>No recent predictions available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Trades -->
+        <div class="card trade-card">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Trades</h5>
+            </div>
+            <div class="card-body">
+                <div class="streaming-data" id="trades-container">
+                    {% if recent_trades and recent_trades.trades %}
+                        {% for trade in recent_trades.trades %}
+                            <div class="card mb-2">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-2">
+                                            <h6>Symbol</h6>
+                                            <p>{{ trade.symbol }}</p>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <h6>Action</h6>
+                                            <p>{{ trade.action }}</p>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <h6>Price</h6>
+                                            <p>{{ trade.price }}</p>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <h6>Quantity</h6>
+                                            <p>{{ trade.quantity }}</p>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <h6>Timestamp</h6>
+                                            <p>{{ trade.timestamp }}</p>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <h6>Notes</h6>
+                                            <p>{{ trade.notes if trade.notes else 'N/A' }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>No recent trades available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Function to handle prediction updates
+        function handlePredictionUpdate(data) {
+            const container = document.getElementById('predictions-container');
+            container.innerHTML = '';
+
+            if (data.data && data.data.predictions) {
+                data.data.predictions.forEach(prediction => {
+                    const card = document.createElement('div');
+                    card.className = 'card mb-2';
+                    card.innerHTML = `
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <h6>Symbol</h6>
+                                    <p>${prediction.symbol}</p>
+                                </div>
+                                <div class="col-md-3">
+                                    <h6>Prediction</h6>
+                                    <p>${prediction.prediction_class}</p>
+                                </div>
+                                <div class="col-md-3">
+                                    <h6>Confidence</h6>
+                                    <p>${(prediction.confidence * 100).toFixed(2)}%</p>
+                                </div>
+                                <div class="col-md-3">
+                                    <h6>Timestamp</h6>
+                                    <p>${prediction.timestamp}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } else {
+                container.innerHTML = '<p>No recent predictions available.</p>';
+            }
+        }
+
+        // Function to handle trade updates
+        function handleTradeUpdate(data) {
+            const container = document.getElementById('trades-container');
+            container.innerHTML = '';
+
+            if (data.data && data.data.trades) {
+                data.data.trades.forEach(trade => {
+                    const card = document.createElement('div');
+                    card.className = 'card mb-2';
+                    card.innerHTML = `
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <h6>Symbol</h6>
+                                    <p>${trade.symbol}</p>
+                                </div>
+                                <div class="col-md-2">
+                                    <h6>Action</h6>
+                                    <p>${trade.action}</p>
+                                </div>
+                                <div class="col-md-2">
+                                    <h6>Price</h6>
+                                    <p>${trade.price}</p>
+                                </div>
+                                <div class="col-md-2">
+                                    <h6>Quantity</h6>
+                                    <p>${trade.quantity}</p>
+                                </div>
+                                <div class="col-md-2">
+                                    <h6>Timestamp</h6>
+                                    <p>${trade.timestamp}</p>
+                                </div>
+                                <div class="col-md-2">
+                                    <h6>Notes</h6>
+                                    <p>${trade.notes || 'N/A'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } else {
+                container.innerHTML = '<p>No recent trades available.</p>';
+            }
+        }
+
+        // Set up event source for predictions
+        const predictionsEventSource = new EventSource('/stream/predictions');
+        predictionsEventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            handlePredictionUpdate(data);
+        };
+
+        // Set up event source for trades
+        const tradesEventSource = new EventSource('/stream/trades');
+        tradesEventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            handleTradeUpdate(data);
+        };
+
+        // Handle prediction button click
+        document.getElementById('predict-btn').addEventListener('click', function() {
+            const symbol = document.getElementById('symbol-input').value;
+
+            fetch('/api/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ symbol: symbol })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    alert('Prediction task created with ID: ' + data.task_id);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while creating prediction task');
+            });
+        });
+
+        // Handle retrain button click
+        document.getElementById('retrain-btn').addEventListener('click', function() {
+            const symbol = prompt('Enter symbol for retraining (default: EURUSD=X):', 'EURUSD=X');
+            const startDate = prompt('Enter start date for training data (default: 2019-01-01):', '2019-01-01');
+
+            fetch('/api/retrain', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    symbol: symbol,
+                    start_date: startDate
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    alert('Retrain task created with ID: ' + data.task_id);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while creating retrain task');
+            });
+        });
+    </script>
+</body>
+</html>

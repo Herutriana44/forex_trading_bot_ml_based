@@ -1,0 +1,154 @@
+{
+  "info": {
+    "name": "Forex Trading Bot API",
+    "description": "REST API collection for forex trading bot with ML model inference",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "0.1.0"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "task_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Predictions",
+      "item": [
+        {
+          "name": "Create Prediction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"EURUSD=X\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/predict",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "predict"]
+            }
+          }
+        },
+        {
+          "name": "Get Prediction Result",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/predict/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "predict", "{{task_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Model",
+      "item": [
+        {
+          "name": "Get Model Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/model/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "model", "status"]
+            }
+          }
+        },
+        {
+          "name": "Create Retrain Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"EURUSD=X\",\n  \"start_date\": \"2019-01-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/model/retrain",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "model", "retrain"]
+            }
+          }
+        },
+        {
+          "name": "Get Retrain Result",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/model/retrain/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "model", "retrain", "{{task_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Trades",
+      "item": [
+        {
+          "name": "Create Trade",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"EURUSD=X\",\n  \"action\": \"BUY\",\n  \"price\": 1.1234,\n  \"quantity\": 1.0,\n  \"notes\": \"Test trade entry\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/trades",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "trades"]
+            }
+          }
+        },
+        {
+          "name": "List Trades",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/trades?limit=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "trades"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

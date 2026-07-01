@@ -3,17 +3,34 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 
+# Environment
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO" if ENVIRONMENT == "production" else "DEBUG")
+
+# Redis
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
 
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/db/trading.db")
+# Database
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"sqlite:///{BASE_DIR}/db/trading.db"
+)
 
+# CORS
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
+if CORS_ORIGINS == ["*"]:
+    CORS_ORIGINS = ["*"]
+
+# Models
 MODELS_DIR = BASE_DIR / "models"
 MODEL_VERSIONED_DIR = MODELS_DIR / "versioned"
 MODEL_CURRENT_DIR = MODELS_DIR / "current"
 MODEL_FILENAME = "model.pkl"
 MODEL_METADATA_FILENAME = "metadata.json"
 
+# Trading
 DEFAULT_SYMBOL = "EURUSD=X"
 DEFAULT_START_DATE = "2019-01-01"
 DEFAULT_LOOKBACK_DAYS = 100

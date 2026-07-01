@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: forex-bot-postgres
+    environment:
+      POSTGRES_USER: forex_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-forex_password}
+      POSTGRES_DB: forex_trading
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forex_user -d forex_trading"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - forex-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: forex-bot-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - forex-network
+
+  fastapi-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forex-bot-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://forex_user:${POSTGRES_PASSWORD:-forex_password}@postgres:5432/forex_trading
+      REDIS_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./models:/app/models
+    networks:
+      - forex-network
+    restart: unless-stopped
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    container_name: forex-bot-celery-worker
+    environment:
+      DATABASE_URL: postgresql://forex_user:${POSTGRES_PASSWORD:-forex_password}@postgres:5432/forex_trading
+      REDIS_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      fastapi-backend:
+        condition: service_started
+    volumes:
+      - ./src:/app/src
+      - ./models:/app/models
+    networks:
+      - forex-network
+    restart: unless-stopped
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    container_name: forex-bot-celery-beat
+    command: celery -A src.tasks.celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    environment:
+      DATABASE_URL: postgresql://forex_user:${POSTGRES_PASSWORD:-forex_password}@postgres:5432/forex_trading
+      REDIS_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+    networks:
+      - forex-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  forex-network:
+    driver: bridge

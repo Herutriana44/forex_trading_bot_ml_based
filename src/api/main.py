@@ -4,9 +4,14 @@ FastAPI application for forex trading bot.
 
 from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from typing import List, Optional
 from datetime import datetime
 import json
+import logging
+from pathlib import Path
+import socketio
 
 from .models import (
     PredictionRequest, PredictionResponse, PredictionResult,
@@ -16,10 +21,19 @@ from .models import (
 from .dependencies import (
     get_celery_app, get_predictor_instance, get_db_session
 )
+from .websocket_handler import (
+    handle_predictions_connect, handle_predictions_disconnect,
+    handle_trades_connect, handle_trades_disconnect,
+    handle_tasks_connect, handle_tasks_disconnect,
+    broadcast_prediction, broadcast_trade, broadcast_task_status,
+    get_connection_stats
+)
 from ..tasks.inference_tasks import predict_task
 from ..tasks.retraining_tasks import retrain_task
 from ..db.logging import log_trade, Prediction, Trade, ModelMetrics
-from ..config import MODEL_CURRENT_DIR, MODEL_METADATA_FILENAME
+from ..config import MODEL_CURRENT_DIR, MODEL_METADATA_FILENAME, CORS_ORIGINS
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Forex Trading Bot API",
@@ -28,13 +42,25 @@ app = FastAPI(
 )
 
 # CORS middleware
+cors_origins = CORS_ORIGINS if isinstance(CORS_ORIGINS, list) else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Socket.IO setup
+sio = socketio.AsyncServer(
+    async_mode='asgi',
+    cors_allowed_origins=cors_origins,
+    ping_timeout=60,
+    ping_interval=25
+)
+
+# Wrap FastAPI with Socket.IO ASGI app
+app_with_socket = socketio.ASGIApp(sio, app)
 
 
 @app.post("/api/v1/predict", response_model=PredictionResponse)
@@ -213,3 +239,121 @@ async def list_trades(
         ],
         "count": len(trades)
     }
+
+
+# WebSocket Event Handlers - Predictions Namespace
+@sio.on('connect', namespace='/predictions')
+async def on_connect_predictions(sid, environ):
+    """Handle client connection to predictions namespace."""
+    await handle_predictions_connect(sid)
+    logger.info(f"Predictions client {sid} connected")
+
+
+@sio.on('disconnect', namespace='/predictions')
+async def on_disconnect_predictions(sid):
+    """Handle client disconnection from predictions namespace."""
+    await handle_predictions_disconnect(sid)
+    logger.info(f"Predictions client {sid} disconnected")
+
+
+# WebSocket Event Handlers - Trades Namespace
+@sio.on('connect', namespace='/trades')
+async def on_connect_trades(sid, environ):
+    """Handle client connection to trades namespace."""
+    await handle_trades_connect(sid)
+    logger.info(f"Trades client {sid} connected")
+
+
+@sio.on('disconnect', namespace='/trades')
+async def on_disconnect_trades(sid):
+    """Handle client disconnection from trades namespace."""
+    await handle_trades_disconnect(sid)
+    logger.info(f"Trades client {sid} disconnected")
+
+
+# WebSocket Event Handlers - Tasks Namespace
+@sio.on('connect', namespace='/tasks')
+async def on_connect_tasks(sid, environ):
+    """Handle client connection to tasks namespace."""
+    await handle_tasks_connect(sid)
+    logger.info(f"Tasks client {sid} connected")
+
+
+@sio.on('disconnect', namespace='/tasks')
+async def on_disconnect_tasks(sid):
+    """Handle client disconnection from tasks namespace."""
+    await handle_tasks_disconnect(sid)
+    logger.info(f"Tasks client {sid} disconnected")
+
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring."""
+    return {
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat(),
+        "websocket_connections": get_connection_stats()
+    }
+
+
+# Broadcast endpoints (called by Celery tasks)
+@app.post("/api/v1/broadcast/prediction")
+async def broadcast_prediction_endpoint(prediction_data: dict):
+    """Endpoint for Celery tasks to broadcast prediction results."""
+    try:
+        await broadcast_prediction(sio, prediction_data)
+        return {"status": "ok", "message": "Prediction broadcasted"}
+    except Exception as e:
+        logger.error(f"Error broadcasting prediction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/broadcast/trade")
+async def broadcast_trade_endpoint(trade_data: dict):
+    """Endpoint for Celery tasks to broadcast trade results."""
+    try:
+        await broadcast_trade(sio, trade_data)
+        return {"status": "ok", "message": "Trade broadcasted"}
+    except Exception as e:
+        logger.error(f"Error broadcasting trade: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/broadcast/task-status")
+async def broadcast_task_status_endpoint(task_id: str, status: str, result: dict = None):
+    """Endpoint for Celery tasks to broadcast task status updates."""
+    try:
+        await broadcast_task_status(sio, task_id, status, result)
+        return {"status": "ok", "message": "Task status broadcasted"}
+    except Exception as e:
+        logger.error(f"Error broadcasting task status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Mount static files
+frontend_dir = Path(__file__).parent.parent / "frontend"
+if (frontend_dir / "static").exists():
+    app.mount("/static", StaticFiles(directory=str(frontend_dir / "static")), name="static")
+
+
+# Serve frontend
+@app.get("/")
+async def frontend_root():
+    """Serve main dashboard."""
+    frontend_file = Path(__file__).parent.parent / "frontend" / "index.html"
+    if frontend_file.exists():
+        return FileResponse(frontend_file, media_type="text/html")
+    return {"status": "ok", "message": "API Server Running"}
+
+
+# Add logging middleware
+from src.api.middleware.logging import StructuredLoggingMiddleware
+from src.api.routes.health import router as health_router
+
+app.add_middleware(StructuredLoggingMiddleware)
+app.include_router(health_router)
+
+# Initialize structured logging
+from src.api.config.logging import setup_logging
+from ..config import LOG_LEVEL
+setup_logging(LOG_LEVEL)

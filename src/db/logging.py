@@ -25,7 +25,7 @@ class Prediction(Base):
     confidence = Column(Float)
     current_price = Column(Float)
     timestamp = Column(DateTime, default=datetime.utcnow)
-    extra_data = Column("metadata", Text)
+    extra_data = Column("extra_data", Text)
 
 
 class Trade(Base):
@@ -50,7 +50,7 @@ class ModelMetrics(Base):
     precision = Column(Float)
     recall = Column(Float)
     timestamp = Column(DateTime, default=datetime.utcnow)
-    extra_data = Column("metadata", Text)
+    extra_data = Column("extra_data", Text)
 
 
 Base.metadata.create_all(bind=engine)

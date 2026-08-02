@@ -1,119 +1,129 @@
-// REST API client for backend communication
-const API_BASE_URL = `${window.location.protocol}//${window.location.host}/api/v1`;
+/**
+ * api-client.js — REST + SSE client
+ * Handles all HTTP calls and the Server-Sent Events price stream.
+ */
+
+const API_BASE = `${location.protocol}//${location.host}/api/v1`;
 
 class APIClient {
-    constructor() {
-        this.baseURL = API_BASE_URL;
-        this.taskIds = {};
-    }
+  constructor() {
+    this.baseURL  = API_BASE;
+    this._sseConn = null; // active EventSource
+  }
 
-    async request(endpoint, options = {}) {
-        const url = `${this.baseURL}${endpoint}`;
-        const response = await fetch(url, {
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            },
-            ...options
-        });
+  // ── Generic fetch wrapper ────────────────────────────────────────────────
 
-        if (!response.ok) {
-            throw new Error(`API error: ${response.status} ${response.statusText}`);
+  async request(endpoint, options = {}) {
+    const res = await fetch(`${this.baseURL}${endpoint}`, {
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+      ...options,
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+    return res.json();
+  }
+
+  // ── Symbol list ──────────────────────────────────────────────────────────
+
+  async getSymbols() {
+    return this.request('/symbols');
+  }
+
+  // ── Model ────────────────────────────────────────────────────────────────
+
+  async getModelStatus() {
+    return this.request('/model/status');
+  }
+
+  // ── Predictions ──────────────────────────────────────────────────────────
+
+  async predictSymbol(symbol) {
+    return this.request('/predict', {
+      method: 'POST',
+      body: JSON.stringify({ symbol }),
+    });
+  }
+
+  async getPredictionResult(taskId) {
+    return this.request(`/predict/${taskId}`);
+  }
+
+  // ── Retraining ───────────────────────────────────────────────────────────
+
+  async retrainModel(symbol, startDate) {
+    return this.request('/model/retrain', {
+      method: 'POST',
+      body: JSON.stringify({ symbol, start_date: startDate }),
+    });
+  }
+
+  async getRetrainResult(taskId) {
+    return this.request(`/model/retrain/${taskId}`);
+  }
+
+  // ── Trades ───────────────────────────────────────────────────────────────
+
+  async getTrades(limit = 50) {
+    return this.request(`/trades?limit=${limit}`);
+  }
+
+  async createTrade(tradeData) {
+    return this.request('/trades', {
+      method: 'POST',
+      body: JSON.stringify(tradeData),
+    });
+  }
+
+  // ── Health ───────────────────────────────────────────────────────────────
+
+  async healthCheck() {
+    const res = await fetch(`${location.protocol}//${location.host}/health`);
+    return res.json();
+  }
+
+  // ── SSE price stream ─────────────────────────────────────────────────────
+
+  /**
+   * Open an SSE connection to /api/v1/stream/prices.
+   * @param {string[]} symbols  — array of symbol strings to subscribe to
+   * @param {function} onTick   — called with each price tick object
+   * @param {function} onError  — called on connection error
+   */
+  openPriceStream(symbols = [], onTick, onError) {
+    this.closePriceStream();
+
+    const query = symbols.length
+      ? `?symbols=${encodeURIComponent(symbols.join(','))}`
+      : '';
+
+    const es = new EventSource(`${this.baseURL}/stream/prices${query}`);
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'tick' && typeof onTick === 'function') {
+          onTick(data);
         }
+      } catch (_) {}
+    };
 
-        return await response.json();
-    }
+    es.onerror = () => {
+      if (typeof onError === 'function') onError();
+    };
 
-    async getModelStatus() {
-        try {
-            return await this.request('/model/status');
-        } catch (error) {
-            console.error('Error fetching model status:', error);
-            throw error;
-        }
-    }
+    this._sseConn = es;
+    return es;
+  }
 
-    async predictSymbol(symbol) {
-        try {
-            const response = await this.request('/predict', {
-                method: 'POST',
-                body: JSON.stringify({ symbol })
-            });
-            this.taskIds.predict = response.task_id;
-            return response;
-        } catch (error) {
-            console.error('Error creating prediction:', error);
-            throw error;
-        }
+  closePriceStream() {
+    if (this._sseConn) {
+      this._sseConn.close();
+      this._sseConn = null;
     }
+  }
 
-    async getPredictionResult(taskId) {
-        try {
-            return await this.request(`/predict/${taskId}`);
-        } catch (error) {
-            console.error('Error fetching prediction result:', error);
-            throw error;
-        }
-    }
-
-    async retrainModel(symbol, startDate) {
-        try {
-            const response = await this.request('/model/retrain', {
-                method: 'POST',
-                body: JSON.stringify({
-                    symbol,
-                    start_date: startDate
-                })
-            });
-            this.taskIds.retrain = response.task_id;
-            return response;
-        } catch (error) {
-            console.error('Error creating retrain task:', error);
-            throw error;
-        }
-    }
-
-    async getRetrainResult(taskId) {
-        try {
-            return await this.request(`/model/retrain/${taskId}`);
-        } catch (error) {
-            console.error('Error fetching retrain result:', error);
-            throw error;
-        }
-    }
-
-    async getTrades(limit = 50) {
-        try {
-            return await this.request(`/trades?limit=${limit}`);
-        } catch (error) {
-            console.error('Error fetching trades:', error);
-            throw error;
-        }
-    }
-
-    async createTrade(tradeData) {
-        try {
-            return await this.request('/trades', {
-                method: 'POST',
-                body: JSON.stringify(tradeData)
-            });
-        } catch (error) {
-            console.error('Error creating trade:', error);
-            throw error;
-        }
-    }
-
-    async healthCheck() {
-        try {
-            const url = `${window.location.protocol}//${window.location.host}/health`;
-            const response = await fetch(url);
-            return await response.json();
-        } catch (error) {
-            console.error('Error checking health:', error);
-            throw error;
-        }
-    }
+  get sseConnected() {
+    return this._sseConn && this._sseConn.readyState === EventSource.OPEN;
+  }
 }
 
-// Initialize API client globally
 window.apiClient = new APIClient();

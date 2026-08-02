@@ -8,7 +8,7 @@ from datetime import datetime
 
 
 class PredictionRequest(BaseModel):
-    symbol: str = Field("EURUSD=X", description="Forex pair symbol")
+    symbol: str = Field("GBPUSD=X", description="Forex pair symbol (e.g. GBPUSD=X, USDJPY=X)")
 
 
 class PredictionResponse(BaseModel):
@@ -28,7 +28,7 @@ class PredictionResult(BaseModel):
 
 
 class RetrainRequest(BaseModel):
-    symbol: Optional[str] = Field("EURUSD=X", description="Forex pair symbol")
+    symbol: Optional[str] = Field("GBPUSD=X", description="Forex pair symbol")
     start_date: Optional[str] = Field("2019-01-01", description="Start date for training data")
 
 

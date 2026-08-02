@@ -5,7 +5,7 @@ Extracted from simple_bot.py and classification_experiments.py
 
 import pandas as pd
 import numpy as np
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Optional
 from datetime import datetime
 import yfinance as yf
 from ..config import DEFAULT_SYMBOL, DEFAULT_LOOKBACK_DAYS, FEATURE_COLUMNS
@@ -22,7 +22,7 @@ def fetch_latest_data(symbol: str = DEFAULT_SYMBOL, lookback_days: int = DEFAULT
     Returns:
         DataFrame with OHLC data
     """
-    data = yf.download(symbol, period=f"{lookback_days}d", interval="1d")
+    data = yf.download(symbol, period=f"{lookback_days}d", interval="1d", progress=False)
 
     if isinstance(data.columns, pd.MultiIndex):
         data.columns = data.columns.get_level_values(0)
@@ -30,12 +30,52 @@ def fetch_latest_data(symbol: str = DEFAULT_SYMBOL, lookback_days: int = DEFAULT
     return data
 
 
-def prepare_features(data: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+def fetch_current_price(symbol: str) -> Optional[Dict[str, Any]]:
+    """
+    Fetch just the current price and basic stats for a symbol.
+    Lightweight call for streaming/ticker use.
+
+    Args:
+        symbol: Forex pair symbol
+
+    Returns:
+        Dict with price info or None on failure
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        info = ticker.fast_info
+        hist = ticker.history(period="2d", interval="1d", raise_errors=False)
+
+        if hist.empty:
+            return None
+
+        current_price = float(hist["Close"].iloc[-1])
+        prev_price = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else current_price
+        change = current_price - prev_price
+        change_pct = (change / prev_price * 100) if prev_price != 0 else 0.0
+
+        return {
+            "symbol": symbol,
+            "price": round(current_price, 5),
+            "open": round(float(hist["Open"].iloc[-1]), 5),
+            "high": round(float(hist["High"].iloc[-1]), 5),
+            "low": round(float(hist["Low"].iloc[-1]), 5),
+            "prev_close": round(prev_price, 5),
+            "change": round(change, 5),
+            "change_pct": round(change_pct, 4),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    except Exception:
+        return None
+
+
+def prepare_features(data: pd.DataFrame, symbol: str = DEFAULT_SYMBOL) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
     Prepare features for model prediction from raw data.
 
     Args:
         data: Raw OHLC data from yfinance
+        symbol: Forex pair symbol — used to populate metadata correctly
 
     Returns:
         Tuple of (features_df, metadata) where:
@@ -57,13 +97,16 @@ def prepare_features(data: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     # Get the latest row for prediction
     latest_row = df.iloc[[-1]].copy()
 
-    # Extract metadata
-    current_price = latest_row['Close'].iloc[0]
+    # Extract metadata — use the passed symbol, not the hardcoded DEFAULT_SYMBOL
+    current_price = float(latest_row['Close'].iloc[0])
     metadata = {
         "current_price": current_price,
-        "symbol": DEFAULT_SYMBOL,
-        "timestamp": datetime.now().isoformat(),
-        "features_used": FEATURE_COLUMNS
+        "symbol": symbol,
+        "timestamp": datetime.utcnow().isoformat(),
+        "features_used": FEATURE_COLUMNS,
+        "open": float(latest_row['Open'].iloc[0]),
+        "high": float(latest_row['High'].iloc[0]),
+        "low": float(latest_row['Low'].iloc[0]),
     }
 
     # Return only the feature columns

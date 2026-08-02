@@ -1,379 +1,569 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forex Trading Bot - ML Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <style>
-        :root {
-            --primary-color: #2563eb;
-            --success-color: #10b981;
-            --danger-color: #ef4444;
-            --warning-color: #f59e0b;
-            --dark-bg: #0f172a;
-            --card-bg: #1e293b;
-            --text-light: #e2e8f0;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forex Trading Bot — ML Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    /* ── Variables ── */
+    :root {
+      --bg:        #070d1a;
+      --surface:   #0e1829;
+      --surface2:  #162136;
+      --border:    rgba(99,172,255,.12);
+      --primary:   #3b82f6;
+      --primary-d: #2563eb;
+      --success:   #10b981;
+      --danger:    #ef4444;
+      --warning:   #f59e0b;
+      --muted:     rgba(226,232,240,.45);
+      --text:      #e2e8f0;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    }
 
-        body {
-            background-color: var(--dark-bg);
-            color: var(--text-light);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+    /* ── Reset / base ── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: .9rem;
+      margin: 0;
+      overflow-x: hidden;
+    }
 
-        .navbar {
-            background-color: var(--card-bg);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-        .navbar-brand {
-            font-weight: 700;
-            font-size: 1.5rem;
-            color: var(--primary-color) !important;
-        }
+    /* ── Navbar ── */
+    .topbar {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: .65rem 1.25rem;
+      display: flex; align-items: center; gap: 1rem;
+    }
+    .topbar-brand {
+      font-size: 1.15rem; font-weight: 700; color: var(--primary);
+      display: flex; align-items: center; gap: .5rem;
+      text-decoration: none; white-space: nowrap;
+    }
+    .topbar-brand i { font-size: 1.2rem; }
+    .live-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--success); flex-shrink: 0;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,.4); }
+      50%      { opacity: .7; box-shadow: 0 0 0 5px rgba(16,185,129,0); }
+    }
+    .topbar-right {
+      margin-left: auto; display: flex; align-items: center; gap: .75rem;
+      flex-shrink: 0;
+    }
+    .conn-pill {
+      font-size: .72rem; padding: .25rem .6rem;
+      border-radius: 20px; background: var(--surface2);
+      border: 1px solid var(--border); color: var(--muted);
+      display: flex; align-items: center; gap: .3rem;
+    }
+    .conn-pill .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--muted);
+    }
+    .conn-pill.connected .dot { background: var(--success); }
 
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            background-color: rgba(255, 255, 255, 0.1);
-        }
+    /* ── Ticker bar ── */
+    .ticker-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow: hidden; white-space: nowrap;
+      padding: .3rem 0;
+    }
+    .ticker-track {
+      display: inline-flex; gap: 2rem;
+      animation: scroll-ticker 60s linear infinite;
+      padding: 0 1rem;
+    }
+    .ticker-bar:hover .ticker-track { animation-play-state: paused; }
+    @keyframes scroll-ticker {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .ticker-item {
+      display: inline-flex; align-items: center; gap: .4rem;
+      font-size: .78rem; font-family: var(--font-mono);
+      cursor: pointer; padding: .1rem .4rem; border-radius: 4px;
+      transition: background .15s;
+    }
+    .ticker-item:hover { background: var(--surface2); }
+    .ticker-item .sym { color: var(--text); font-weight: 600; }
+    .ticker-item .px  { color: var(--text); }
+    .ticker-item .chg.up   { color: var(--success); }
+    .ticker-item .chg.down { color: var(--danger); }
+    .ticker-item .chg.flat { color: var(--muted); }
 
-        .status-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: var(--success-color);
-            animation: pulse 2s infinite;
-        }
+    /* ── Layout ── */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      grid-template-rows: auto 1fr;
+      min-height: calc(100vh - 80px);
+    }
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 1rem .75rem;
+      overflow-y: auto;
+      grid-row: 1 / 3;
+    }
+    .main-content {
+      padding: 1rem 1.25rem;
+      overflow-y: auto;
+    }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: .75rem;
+      margin-bottom: 1rem;
+    }
+    .card-header {
+      background: rgba(0,0,0,.2);
+      border-bottom: 1px solid var(--border);
+      padding: .65rem 1rem;
+      border-radius: .75rem .75rem 0 0;
+      display: flex; align-items: center; gap: .5rem;
+      font-size: .8rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--muted);
+    }
+    .card-header i { color: var(--primary); }
+    .card-body { padding: 1rem; }
 
-        .card {
-            background-color: var(--card-bg);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 0.75rem;
-        }
+    /* ── Metrics ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: .75rem;
+      margin-bottom: 1rem;
+    }
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: .75rem;
+      padding: 1rem;
+      text-align: center;
+    }
+    .metric-val {
+      font-size: 1.6rem; font-weight: 700;
+      color: var(--primary); line-height: 1;
+      margin-bottom: .3rem;
+    }
+    .metric-lbl {
+      font-size: .7rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .05em;
+    }
 
-        .card-header {
-            background-color: rgba(0, 0, 0, 0.2);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
+    /* ── Sidebar sections ── */
+    .sidebar-section { margin-bottom: 1.25rem; }
+    .sidebar-label {
+      font-size: .65rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .08em;
+      margin-bottom: .4rem; padding: 0 .25rem;
+    }
 
-        .metric-card {
-            text-align: center;
-            padding: 1.5rem;
-        }
+    /* ── Symbol selector in sidebar ── */
+    .sym-search {
+      width: 100%; background: var(--surface2);
+      border: 1px solid var(--border); color: var(--text);
+      border-radius: .4rem; padding: .4rem .6rem;
+      font-size: .8rem; margin-bottom: .5rem;
+      outline: none;
+    }
+    .sym-search:focus { border-color: var(--primary); }
+    .sym-group-label {
+      font-size: .65rem; color: var(--primary);
+      text-transform: uppercase; letter-spacing: .07em;
+      padding: .4rem .25rem .2rem;
+    }
+    .sym-btn {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; background: none; border: none;
+      color: var(--text); padding: .35rem .5rem;
+      border-radius: .4rem; cursor: pointer; font-size: .82rem;
+      transition: background .12s;
+    }
+    .sym-btn:hover { background: var(--surface2); }
+    .sym-btn.active {
+      background: rgba(59,130,246,.15);
+      color: var(--primary); font-weight: 600;
+    }
+    .sym-price-mini {
+      font-family: var(--font-mono); font-size: .75rem;
+      color: var(--muted);
+    }
+    .sym-price-mini.up   { color: var(--success); }
+    .sym-price-mini.down { color: var(--danger); }
 
-        .metric-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            margin-bottom: 0.5rem;
-        }
+    /* ── Control panel inputs ── */
+    .form-control, .form-select {
+      background: var(--surface2) !important;
+      border: 1px solid var(--border) !important;
+      color: var(--text) !important;
+      font-size: .85rem;
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: var(--primary) !important;
+      box-shadow: 0 0 0 2px rgba(59,130,246,.15) !important;
+    }
+    .form-label { font-size: .78rem; color: var(--muted); margin-bottom: .3rem; }
 
-        .metric-label {
-            font-size: 0.875rem;
-            color: rgba(255, 255, 255, 0.6);
-            text-transform: uppercase;
-        }
+    /* ── Buttons ── */
+    .btn { font-size: .82rem; border-radius: .45rem; }
+    .btn-primary  { background: var(--primary); border: none; }
+    .btn-primary:hover { background: var(--primary-d); }
+    .btn-success  { background: var(--success); border: none; }
+    .btn-warning  { background: var(--warning); border: none; color: #000; }
+    .btn-outline-secondary {
+      border-color: var(--border); color: var(--muted);
+    }
+    .btn-outline-secondary:hover { background: var(--surface2); color: var(--text); }
 
-        .table {
-            font-size: 0.875rem;
-        }
+    /* ── Badges ── */
+    .badge-buy  { background: var(--success); color: #fff; padding: .2em .5em; border-radius: .3rem; font-size: .75rem; }
+    .badge-sell { background: var(--danger);  color: #fff; padding: .2em .5em; border-radius: .3rem; font-size: .75rem; }
+    .badge-pending { background: var(--warning); color: #000; padding: .2em .5em; border-radius: .3rem; font-size: .75rem; }
 
-        .table thead th {
-            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-            color: var(--primary-color);
-            text-transform: uppercase;
-            font-size: 0.75rem;
-        }
+    /* ── Charts ── */
+    .chart-wrap { position: relative; height: 240px; }
 
-        .table tbody td {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            vertical-align: middle;
-        }
+    /* ── Tables ── */
+    .table { font-size: .8rem; color: var(--text); margin: 0; }
+    .table thead th {
+      color: var(--primary); font-size: .7rem;
+      text-transform: uppercase; letter-spacing: .05em;
+      border-bottom: 1px solid var(--border); padding: .5rem .75rem;
+      background: rgba(0,0,0,.15);
+    }
+    .table tbody td {
+      border-bottom: 1px solid rgba(255,255,255,.03);
+      padding: .45rem .75rem; vertical-align: middle;
+    }
+    .table tbody tr:hover td { background: rgba(59,130,246,.04); }
+    .table-dark { --bs-table-bg: transparent; }
 
-        .badge-success {
-            background-color: var(--success-color);
-            color: white;
-        }
+    /* ── Event log ── */
+    .event-log {
+      background: rgba(0,0,0,.25);
+      border: 1px solid var(--border);
+      border-radius: .5rem;
+      padding: .75rem;
+      max-height: 220px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: .72rem;
+    }
+    .ev { padding: .3rem .5rem; border-left: 2px solid var(--border); margin-bottom: .3rem; color: rgba(226,232,240,.7); }
+    .ev.success { border-left-color: var(--success); }
+    .ev.error   { border-left-color: var(--danger); }
+    .ev.info    { border-left-color: var(--primary); }
+    .ev.warn    { border-left-color: var(--warning); }
 
-        .badge-danger {
-            background-color: var(--danger-color);
-            color: white;
-        }
+    /* ── Price display (hero) ── */
+    .price-hero {
+      display: flex; align-items: baseline; gap: .5rem;
+      margin-bottom: .25rem;
+    }
+    .price-main {
+      font-size: 2.2rem; font-weight: 700;
+      font-family: var(--font-mono); color: var(--text);
+    }
+    .price-change {
+      font-size: .95rem; font-family: var(--font-mono);
+    }
+    .price-change.up   { color: var(--success); }
+    .price-change.down { color: var(--danger); }
+    .price-change.flat { color: var(--muted); }
+    .ohlc-row {
+      display: flex; gap: 1.5rem;
+      font-size: .75rem; font-family: var(--font-mono); color: var(--muted);
+      margin-top: .25rem;
+    }
+    .ohlc-row span b { color: var(--text); }
 
-        .btn-primary {
-            background-color: var(--primary-color);
-            border: none;
-        }
+    /* ── Model status row ── */
+    .model-stat { display: flex; flex-direction: column; align-items: center; }
+    .model-stat-val { font-size: 1.1rem; font-weight: 700; color: var(--primary); }
+    .model-stat-lbl { font-size: .65rem; color: var(--muted); text-transform: uppercase; }
 
-        .btn-primary:hover {
-            background-color: #1d4ed8;
-        }
-
-        .event-log {
-            background-color: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 0.5rem;
-            padding: 1rem;
-            max-height: 300px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 0.75rem;
-        }
-
-        .event-item {
-            padding: 0.5rem;
-            border-left: 3px solid var(--primary-color);
-            padding-left: 0.75rem;
-            margin-bottom: 0.5rem;
-            color: rgba(255, 255, 255, 0.8);
-        }
-
-        .event-item.success {
-            border-left-color: var(--success-color);
-        }
-
-        .event-item.error {
-            border-left-color: var(--danger-color);
-        }
-
-        .spinner-border {
-            color: var(--primary-color);
-        }
-
-        .connection-stats {
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.6);
-            margin-top: 0.5rem;
-        }
-
-        .chart-container {
-            position: relative;
-            height: 300px;
-            margin-bottom: 2rem;
-        }
-    </style>
+    /* ── Responsive tweaks ── */
+    @media (max-width: 768px) {
+      .dashboard { grid-template-columns: 1fr; }
+      .sidebar { grid-row: unset; border-right: none; border-bottom: 1px solid var(--border); }
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
 </head>
 <body>
-    <nav class="navbar navbar-dark">
-        <div class="container-fluid">
-            <span class="navbar-brand">
-                <i class="fas fa-robot"></i> Forex Trading Bot
-            </span>
-            <div class="status-badge">
-                <span class="status-indicator"></span>
-                <span>Live</span>
-            </div>
-        </div>
-    </nav>
 
-    <main class="container-fluid py-4">
-        <!-- Dashboard Metrics -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card metric-card">
-                    <div class="metric-value" id="metric-predictions">0</div>
-                    <div class="metric-label">Total Predictions</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card metric-card">
-                    <div class="metric-value" id="metric-trades">0</div>
-                    <div class="metric-label">Total Trades</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card metric-card">
-                    <div class="metric-value" id="metric-accuracy">--</div>
-                    <div class="metric-label">Model Accuracy</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card metric-card">
-                    <div class="metric-value" id="metric-connections">0</div>
-                    <div class="metric-label">WebSocket Clients</div>
-                </div>
-            </div>
-        </div>
+<!-- ══ TOP BAR ════════════════════════════════════════════════════════════ -->
+<header class="topbar">
+  <a class="topbar-brand" href="/">
+    <i class="fas fa-robot"></i> Forex Bot
+  </a>
+  <span style="font-size:.75rem;color:var(--muted)">ML Dashboard</span>
 
-        <!-- Model Status -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-brain"></i> Model Status</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>Model Name:</strong> <span id="model-name">Loading...</span></p>
-                                <p><strong>Version:</strong> <span id="model-version">--</span></p>
-                                <p><strong>Last Trained:</strong> <span id="model-timestamp">--</span></p>
-                            </div>
-                            <div class="col-md-6">
-                                <p><strong>Precision:</strong> <span id="model-precision">--</span></p>
-                                <p><strong>Recall:</strong> <span id="model-recall">--</span></p>
-                                <p><strong>Status:</strong> <span class="badge badge-success">Ready</span></p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <div class="topbar-right">
+    <div class="live-dot" title="Live streaming active"></div>
+    <span style="font-size:.75rem;color:var(--muted)">Live</span>
 
-        <!-- Charts -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-chart-line"></i> Prediction Confidence Trend</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="confidenceChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-exchange-alt"></i> Trade Actions</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="tradesChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="conn-pill" id="pill-ticker">
+      <span class="dot"></span> Ticker
+    </div>
+    <div class="conn-pill" id="pill-predictions">
+      <span class="dot"></span> Predictions
+    </div>
+    <div class="conn-pill" id="pill-tasks">
+      <span class="dot"></span> Tasks
+    </div>
 
-        <!-- Control Panel -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Control Panel</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Symbol</label>
-                                <input type="text" class="form-control" id="symbol-input" value="EURUSD=X" placeholder="e.g., EURUSD=X">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Start Date (for retraining)</label>
-                                <input type="date" class="form-control" id="start-date-input" value="2019-01-01">
-                            </div>
-                        </div>
-                        <div class="d-grid gap-2 d-md-flex">
-                            <button class="btn btn-primary" id="btn-predict">
-                                <i class="fas fa-magic"></i> Trigger Prediction
-                            </button>
-                            <button class="btn btn-warning" id="btn-retrain">
-                                <i class="fas fa-sync"></i> Retrain Model
-                            </button>
-                            <button class="btn btn-info" id="btn-refresh-status">
-                                <i class="fas fa-redo"></i> Refresh Status
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <button class="btn btn-sm btn-outline-secondary" id="btn-refresh-status">
+      <i class="fas fa-redo"></i>
+    </button>
+  </div>
+</header>
 
-        <!-- Recent Predictions -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-crystal-ball"></i> Recent Predictions</h5>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-dark table-hover mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Symbol</th>
-                                    <th>Prediction</th>
-                                    <th>Confidence</th>
-                                    <th>Price</th>
-                                </tr>
-                            </thead>
-                            <tbody id="predictions-table">
-                                <tr><td colspan="5" class="text-center text-muted">No predictions yet</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+<!-- ══ TICKER BAR ═══════════════════════════════════════════════════════ -->
+<div class="ticker-bar" id="ticker-bar">
+  <div class="ticker-track" id="ticker-track">
+    <!-- filled by JS -->
+    <span class="ticker-item"><span class="sym">Loading…</span></span>
+  </div>
+</div>
 
-        <!-- Trade History -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-history"></i> Trade History</h5>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-dark table-hover mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Symbol</th>
-                                    <th>Action</th>
-                                    <th>Price</th>
-                                    <th>Quantity</th>
-                                    <th>Notes</th>
-                                </tr>
-                            </thead>
-                            <tbody id="trades-table">
-                                <tr><td colspan="6" class="text-center text-muted">No trades yet</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+<!-- ══ DASHBOARD LAYOUT ═════════════════════════════════════════════════ -->
+<div class="dashboard">
 
-        <!-- Real-time Event Log -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-terminal"></i> Real-time Event Log</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="event-log" id="event-log">
-                            <div class="event-item success">● Connected to WebSocket server</div>
-                        </div>
-                        <div class="connection-stats">
-                            Predictions: <span id="ws-predictions">0</span> |
-                            Trades: <span id="ws-trades">0</span> |
-                            Tasks: <span id="ws-tasks">0</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
 
-    <script src="/static/js/socket-client.js"></script>
-    <script src="/static/js/api-client.js"></script>
-    <script src="/static/js/ui-manager.js"></script>
+    <!-- Symbol search + list -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Symbols</div>
+      <input class="sym-search" id="sym-search" type="text" placeholder="Search symbol…" />
+      <div id="sym-list">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- Model stats mini -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Model</div>
+      <div class="card" style="margin:0">
+        <div class="card-body" style="padding:.75rem">
+          <div style="font-size:.78rem;margin-bottom:.5rem">
+            <span id="sb-model-name" style="color:var(--primary);font-weight:600">—</span>
+            <span style="float:right;color:var(--muted);font-size:.7rem" id="sb-model-ver">v—</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;text-align:center">
+            <div class="model-stat"><div class="model-stat-val" id="sb-acc">—</div><div class="model-stat-lbl">Acc</div></div>
+            <div class="model-stat"><div class="model-stat-val" id="sb-pre">—</div><div class="model-stat-lbl">Pre</div></div>
+            <div class="model-stat"><div class="model-stat-val" id="sb-rec">—</div><div class="model-stat-lbl">Rec</div></div>
+          </div>
+          <div style="font-size:.65rem;color:var(--muted);margin-top:.4rem;text-align:center" id="sb-model-ts">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick predict -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Quick Actions</div>
+      <button class="btn btn-primary w-100 mb-2" id="btn-predict">
+        <i class="fas fa-bolt me-1"></i> Predict Selected
+      </button>
+      <button class="btn btn-warning w-100" id="btn-retrain">
+        <i class="fas fa-sync me-1"></i> Retrain Model
+      </button>
+      <div style="margin-top:.6rem">
+        <label class="form-label">Start Date</label>
+        <input type="date" class="form-control form-control-sm" id="start-date-input" value="2019-01-01" />
+      </div>
+    </div>
+
+    <!-- Connection stats -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Connections</div>
+      <div style="font-size:.72rem;font-family:var(--font-mono);color:var(--muted)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:.2rem">
+          <span>Ticker</span><span id="stat-ticker" style="color:var(--success)">0</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:.2rem">
+          <span>Predictions</span><span id="stat-pred" style="color:var(--success)">0</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:.2rem">
+          <span>Tasks</span><span id="stat-tasks" style="color:var(--success)">0</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span>SSE</span><span id="stat-sse" style="color:var(--muted)">—</span>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── MAIN CONTENT ── -->
+  <main class="main-content">
+
+    <!-- Metrics row -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-val" id="metric-predictions">0</div>
+        <div class="metric-lbl">Predictions</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val" id="metric-trades">0</div>
+        <div class="metric-lbl">Trades</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val" id="metric-accuracy">—</div>
+        <div class="metric-lbl">Accuracy</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val" id="metric-connections">0</div>
+        <div class="metric-lbl">WS Clients</div>
+      </div>
+    </div>
+
+    <!-- Selected symbol hero card -->
+    <div class="card mb-3" id="symbol-hero-card">
+      <div class="card-header">
+        <i class="fas fa-chart-line"></i>
+        <span id="hero-sym-label">Select a symbol</span>
+        <span class="ms-auto" style="font-family:var(--font-mono);font-size:.7rem;color:var(--muted)" id="hero-last-update">—</span>
+      </div>
+      <div class="card-body">
+        <div class="row align-items-center">
+          <div class="col-md-5">
+            <div class="price-hero">
+              <span class="price-main" id="hero-price">—</span>
+              <span class="price-change" id="hero-chg">—</span>
+            </div>
+            <div class="ohlc-row">
+              <span>O <b id="hero-open">—</b></span>
+              <span>H <b id="hero-high">—</b></span>
+              <span>L <b id="hero-low">—</b></span>
+              <span>P <b id="hero-prev">—</b></span>
+            </div>
+          </div>
+          <div class="col-md-7">
+            <div class="chart-wrap">
+              <canvas id="priceChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="row mb-3">
+      <div class="col-md-8">
+        <div class="card h-100">
+          <div class="card-header">
+            <i class="fas fa-chart-area"></i> Confidence Trend
+          </div>
+          <div class="card-body">
+            <div class="chart-wrap">
+              <canvas id="confidenceChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100">
+          <div class="card-header">
+            <i class="fas fa-chart-pie"></i> Signal Split
+          </div>
+          <div class="card-body d-flex align-items-center">
+            <div class="chart-wrap w-100" style="height:200px">
+              <canvas id="tradesChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Predictions table -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="fas fa-bolt"></i> Recent Predictions
+        <span class="ms-auto badge" style="background:var(--surface2);color:var(--muted);font-size:.65rem" id="pred-count">0</span>
+      </div>
+      <div class="card-body p-0">
+        <div style="overflow-x:auto">
+          <table class="table table-dark">
+            <thead>
+              <tr>
+                <th>Time</th><th>Symbol</th><th>Signal</th>
+                <th>Confidence</th><th>Price</th>
+              </tr>
+            </thead>
+            <tbody id="predictions-table">
+              <tr><td colspan="5" class="text-center py-3" style="color:var(--muted)">No predictions yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trades table -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="fas fa-exchange-alt"></i> Trade History
+        <span class="ms-auto badge" style="background:var(--surface2);color:var(--muted);font-size:.65rem" id="trade-count">0</span>
+      </div>
+      <div class="card-body p-0">
+        <div style="overflow-x:auto">
+          <table class="table table-dark">
+            <thead>
+              <tr>
+                <th>Time</th><th>Symbol</th><th>Action</th>
+                <th>Price</th><th>Qty</th><th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="trades-table">
+              <tr><td colspan="6" class="text-center py-3" style="color:var(--muted)">No trades yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Event log -->
+    <div class="card">
+      <div class="card-header">
+        <i class="fas fa-terminal"></i> Event Log
+        <button class="btn btn-sm btn-outline-secondary ms-auto" id="btn-clear-log" style="padding:.1rem .5rem;font-size:.7rem">Clear</button>
+      </div>
+      <div class="card-body p-2">
+        <div class="event-log" id="event-log"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="/static/js/api-client.js"></script>
+<script src="/static/js/socket-client.js"></script>
+<script src="/static/js/ui-manager.js"></script>
 </body>
 </html>

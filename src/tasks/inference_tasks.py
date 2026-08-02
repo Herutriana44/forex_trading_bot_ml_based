@@ -28,7 +28,7 @@ def predict_task(symbol: str) -> Dict[str, Any]:
 
         # Fetch and prepare data
         raw_data = fetch_latest_data(symbol)
-        features, metadata = prepare_features(raw_data)
+        features, metadata = prepare_features(raw_data, symbol=symbol)
 
         # Make prediction
         prediction = model.predict(features)
